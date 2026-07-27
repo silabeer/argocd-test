@@ -21,7 +21,7 @@ spec:
 
   source:
     repoURL: https://github.com/silabeer/argocd-test
-    targetRevision: main
+    targetRevision: cilium-1.20
     path: clusters/yc-test/bootstrap
 
   destination:

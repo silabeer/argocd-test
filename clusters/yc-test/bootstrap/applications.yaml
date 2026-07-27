@@ -19,12 +19,12 @@ spec:
   sources:
     - repoURL: https://helm.cilium.io/
       chart: cilium
-      targetRevision: 1.19.6
+      targetRevision: 1.20.0-rc.1
       helm:
         valueFiles:
           - $values/clusters/yc-test/values/cilium.yaml
     - repoURL: https://github.com/silabeer/argocd-test
-      targetRevision: main
+      targetRevision: cilium-1.20
       ref: values
 
   destination:
@@ -85,7 +85,7 @@ spec:
         valueFiles:
           - $values/clusters/yc-test/values/argocd.yaml
     - repoURL: https://github.com/silabeer/argocd-test
-      targetRevision: main
+      targetRevision: cilium-1.20
       ref: values
 
   destination:
@@ -117,7 +117,7 @@ spec:
 
   source:
     repoURL: https://github.com/silabeer/argocd-test
-    targetRevision: main
+    targetRevision: cilium-1.20
     path: applications/podinfo
 
   destination:
