@@ -1,0 +1,35 @@
+---
+# Выделенный проект для platform-компонентов (раздел 18.3, wave -20).
+#
+# На стенде root Application остаётся в default, чтобы не усложнять первый
+# прогон. В production он переводится сюда, и в проекте запрещается delete
+# через Argo CD RBAC.
+apiVersion: argoproj.io/v1alpha1
+kind: AppProject
+metadata:
+  name: platform-root
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "-20"
+spec:
+  description: Инфраструктурные компоненты кластера
+
+  # Источники ограничены: произвольный репозиторий сюда не подключить.
+  sourceRepos:
+    - https://github.com/silabeer/argocd-test
+    - https://helm.cilium.io/
+    - https://argoproj.github.io/argo-helm
+
+  destinations:
+    - server: https://kubernetes.default.svc
+      namespace: "*"
+
+  # Инфраструктурные компоненты создают cluster-scoped ресурсы
+  # (CRD, ClusterRole, StorageClass), поэтому разрешены явно.
+  clusterResourceWhitelist:
+    - group: "*"
+      kind: "*"
+
+  namespaceResourceWhitelist:
+    - group: "*"
+      kind: "*"

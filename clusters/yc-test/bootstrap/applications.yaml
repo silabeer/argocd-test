@@ -1,0 +1,101 @@
+---
+# Takeover Cilium: Argo CD перенимает установку, сделанную Ansible
+# на этапе 50 (раздел 4.3, wave -10).
+#
+# Чарт берётся тот же и той же версии, values — тот же файл в этом
+# репозитории. Multi-source: первый источник даёт чарт, второй ($values)
+# отдаёт файл values из Git. Любое расхождение здесь означало бы вечный
+# OutOfSync после takeover.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: cilium
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "-10"
+spec:
+  project: platform-root
+
+  sources:
+    - repoURL: https://helm.cilium.io/
+      chart: cilium
+      targetRevision: 1.19.6
+      helm:
+        valueFiles:
+          - $values/clusters/yc-test/values/cilium.yaml
+    - repoURL: https://github.com/silabeer/argocd-test
+      targetRevision: main
+      ref: values
+
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: kube-system
+
+  syncPolicy:
+    # Автоматика включается ПОСЛЕ первого ручного sync и проверки
+    # `cilium status --wait`. prune — последним и осознанно (раздел 4.3).
+    syncOptions:
+      # Server-Side Apply корректно перехватывает владение полями
+      # у field manager, которым Ansible применял манифесты.
+      - ServerSideApply=true
+      - RespectIgnoreDifferences=true
+
+  # Сертификаты, которые чарт генерирует при каждом рендере. Без этого
+  # Application останется OutOfSync навсегда (раздел 4.3).
+  ignoreDifferences:
+    - group: ""
+      kind: Secret
+      name: cilium-ca
+      namespace: kube-system
+      jsonPointers:
+        - /data
+    - group: ""
+      kind: Secret
+      name: hubble-server-certs
+      namespace: kube-system
+      jsonPointers:
+        - /data
+    - group: ""
+      kind: Secret
+      name: hubble-relay-client-certs
+      namespace: kube-system
+      jsonPointers:
+        - /data
+---
+# Argo CD, управляющий сам собой (раздел 20, wave -20).
+#
+# Первый sync выполняется вручную: во время него перезапускаются
+# repo-server и application-controller, и Application некоторое время
+# остаётся Progressing — это ожидаемо.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: argocd
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "-20"
+spec:
+  project: platform-root
+
+  sources:
+    - repoURL: https://argoproj.github.io/argo-helm
+      chart: argo-cd
+      targetRevision: 10.2.1
+      helm:
+        valueFiles:
+          - $values/clusters/yc-test/values/argocd.yaml
+    - repoURL: https://github.com/silabeer/argocd-test
+      targetRevision: main
+      ref: values
+
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: argocd
+
+  syncPolicy:
+    syncOptions:
+      # Обязателен и по другой причине: CRD Argo CD превышают лимит
+      # аннотации last-applied-configuration, и клиентский apply на них
+      # невозможен в принципе.
+      - ServerSideApply=true
+      - RespectIgnoreDifferences=true

@@ -1,0 +1,12 @@
+---
+# Содержимое, которое синхронизирует root Application.
+#
+# root-application.yaml включён в список намеренно: приложение управляет
+# собой, и его правки идут через Git.
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+resources:
+  - root-application.yaml
+  - projects.yaml
+  - applications.yaml

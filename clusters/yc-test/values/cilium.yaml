@@ -1,0 +1,36 @@
+---
+# Values Cilium для стенда yc-test.
+#
+# Единственный источник values и для bootstrap-установки Ansible (этап 50),
+# и для Application, забирающей Cilium под управление Argo CD (wave -10).
+# Расхождение между ними означало бы вечный OutOfSync — раздел 4.3 playbook.
+
+# На первом этапе сохраняется штатный kube-proxy. Его замена Cilium —
+# отдельное решение с отдельным тестированием (раздел 21.2).
+kubeProxyReplacement: false
+
+# Адреса Pod-подсетей узлам раздаёт controller-manager Kubernetes.
+ipam:
+  mode: kubernetes
+
+operator:
+  # На стенде один экземпляр: для production нужно два (раздел 17).
+  replicas: 1
+
+hubble:
+  enabled: true
+  relay:
+    enabled: true
+  ui:
+    # UI требует ingress, которого на стенде нет.
+    enabled: false
+
+# Перекатывает Pod'ы Cilium при изменении ConfigMap.
+rollOutCiliumPods: true
+
+# Узлы стенда — 4 vCPU / 3.9 ГБ, поэтому запросы ресурсов занижены
+# относительно значений по умолчанию.
+resources:
+  requests:
+    cpu: 100m
+    memory: 256Mi
