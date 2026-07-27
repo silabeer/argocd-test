@@ -10,7 +10,11 @@ metadata:
   name: platform-root
   namespace: argocd
   annotations:
-    argocd.argoproj.io/sync-wave: "-20"
+    # Волна РАНЬШЕ, чем у любого Application: приложение, ссылающееся на
+    # несуществующий проект, отвергается с InvalidSpecError. При равных
+    # волнах порядок между AppProject и Application не определён, и это
+    # воспроизводимо ломает первый sync на чистом кластере.
+    argocd.argoproj.io/sync-wave: "-30"
 spec:
   description: Инфраструктурные компоненты кластера
 
@@ -29,6 +33,42 @@ spec:
   clusterResourceWhitelist:
     - group: "*"
       kind: "*"
+
+  namespaceResourceWhitelist:
+    - group: "*"
+      kind: "*"
+---
+# Отдельный проект для пользовательских приложений.
+#
+# Раздел 29.4 требует не давать командам доступ к default project и
+# ограничивать destination namespaces. Здесь это и сделано: приложения
+# этого проекта могут писать только в собственный namespace и не создают
+# cluster-scoped ресурсы.
+apiVersion: argoproj.io/v1alpha1
+kind: AppProject
+metadata:
+  name: applications
+  namespace: argocd
+  annotations:
+    # Раньше любого Application, который на него ссылается.
+    argocd.argoproj.io/sync-wave: "-30"
+spec:
+  description: Пользовательские приложения кластера
+
+  sourceRepos:
+    - https://github.com/silabeer/argocd-test
+
+  destinations:
+    - server: https://kubernetes.default.svc
+      namespace: podinfo
+
+  # Из cluster-scoped ресурсов разрешён ровно один тип: приложение создаёт
+  # собственный namespace вместе с метками Pod Security Admission.
+  # Всё остальное (CRD, ClusterRole, StorageClass) пользовательским
+  # приложениям недоступно.
+  clusterResourceWhitelist:
+    - group: ""
+      kind: Namespace
 
   namespaceResourceWhitelist:
     - group: "*"

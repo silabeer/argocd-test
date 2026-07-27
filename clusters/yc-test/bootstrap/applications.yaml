@@ -99,3 +99,38 @@ spec:
       # невозможен в принципе.
       - ServerSideApply=true
       - RespectIgnoreDifferences=true
+---
+# Пользовательское приложение (раздел 20, wave 20).
+#
+# Едет через Git, а не kubectl: прямое применение ресурсов допускается
+# только при аварийном восстановлении и по break-glass процедуре
+# (раздел 33).
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: podinfo
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "20"
+spec:
+  project: applications
+
+  source:
+    repoURL: https://github.com/silabeer/argocd-test
+    targetRevision: main
+    path: applications/podinfo
+
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: podinfo
+
+  syncPolicy:
+    # Для пользовательского приложения автоматика включена сразу: в отличие
+    # от Cilium и Argo CD, ошибка здесь не выводит из строя сам кластер.
+    automated:
+      selfHeal: true
+      # prune намеренно выключен и включается осознанно, как и везде
+      # в этом репозитории (раздел 4.3).
+      prune: false
+    syncOptions:
+      - CreateNamespace=false
