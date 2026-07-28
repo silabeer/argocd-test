@@ -1,0 +1,47 @@
+---
+# Автоматический аппрув serving-сертификатов kubelet.
+#
+# Кластер поднят с serverTLSBootstrap: true — kubelet не выписывает себе
+# serving-сертификат сам, а запрашивает CSR у кластера. Kubernetes НЕ
+# аппрувит такие CSR автоматически: контроллер подписывает только клиентские
+# сертификаты kubelet. Без этого компонента CSR копятся в Pending, и их
+# аппрувят руками при каждом вводе узла и каждом продлении.
+#
+# Практическое следствие: metrics-server, kubectl top, logs и exec работают
+# по TLS к kubelet. Пока сертификата нет, они либо не работают, либо требуют
+# отключения проверки.
+
+# Имя узла из CSR должно совпасть с этим выражением. Регулярка намеренно
+# узкая: аппрув по имени — это доверие, и его нельзя раздавать по '.*'.
+providerRegex: '^k8s-(cp|worker)-\d{2}$'
+
+# И адрес из SAN должен попадать в подсеть узлов. Вторая независимая
+# проверка: скомпрометированный kubelet не выпишет сертификат на чужой адрес.
+providerIpPrefixes:
+  - 10.129.0.0/24
+
+# На стенде DNS нет: имена узлов разрешаются через /etc/hosts, которого
+# внутри пода не существует. Аппрувер по умолчанию проверяет, что имя из SAN
+# резолвится в адрес узла, и без этой настройки отверг бы все CSR.
+#
+# В production с настоящим DNS переключить в false: проверка полезная.
+bypassDnsResolution: true
+
+# Компонент управления, а не рабочая нагрузка: живёт на control-plane.
+# Иначе он оказывается зависим от worker-узлов, чьи же сертификаты и
+# аппрувит.
+nodeSelector:
+  node-role.kubernetes.io/control-plane: ""
+tolerations:
+  - key: node-role.kubernetes.io/control-plane
+    operator: Exists
+    effect: NoSchedule
+
+priorityClassName: platform-critical
+
+resources:
+  requests:
+    cpu: 10m
+    memory: 32Mi
+  limits:
+    memory: 128Mi

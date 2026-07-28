@@ -1,0 +1,38 @@
+---
+# metrics-server: источник метрик для kubectl top и HPA.
+#
+# Обычная рекомендация «добавьте --kubelet-insecure-tls» здесь НЕ нужна и
+# вредна. Кластер поднят с serverTLSBootstrap, а kubelet-csr-approver
+# аппрувит serving-сертификаты — они подписаны CA кластера, и их можно
+# проверять по-настоящему.
+#
+# CA берётся из ConfigMap kube-root-ca.crt, который Kubernetes создаёт в
+# каждом namespace. Монтировать хостовый /etc/kubernetes/pki не требуется.
+replicas: 1
+
+args:
+  - --kubelet-certificate-authority=/var/run/secrets/kubernetes.io/cluster-ca/ca.crt
+  # Узлы адресуются по внутреннему адресу: kubelet запрашивает SAN именно
+  # на него, и внешний адрес в сертификат не попадает.
+  - --kubelet-preferred-address-types=InternalIP
+
+extraVolumes:
+  - name: cluster-ca
+    configMap:
+      name: kube-root-ca.crt
+      items:
+        - key: ca.crt
+          path: ca.crt
+extraVolumeMounts:
+  - name: cluster-ca
+    mountPath: /var/run/secrets/kubernetes.io/cluster-ca
+    readOnly: true
+
+priorityClassName: platform-critical
+
+resources:
+  requests:
+    cpu: 20m
+    memory: 64Mi
+  limits:
+    memory: 256Mi

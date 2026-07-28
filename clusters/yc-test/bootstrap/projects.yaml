@@ -23,6 +23,10 @@ spec:
     - https://github.com/silabeer/argocd-test
     - https://helm.cilium.io/
     - https://argoproj.github.io/argo-helm
+    - https://charts.jetstack.io
+    - https://postfinance.github.io/kubelet-csr-approver
+    - https://kubernetes-sigs.github.io/metrics-server/
+    - https://github.com/rancher/local-path-provisioner
 
   destinations:
     - server: https://kubernetes.default.svc

@@ -1,0 +1,32 @@
+---
+# cert-manager: выдача и продление сертификатов внутри кластера.
+#
+# Нужен раньше остального: на него опираются webhook'и других компонентов,
+# TLS у Gateway API и ingress. Ставится до них, отсюда ранняя волна.
+
+# CRD ставит сам чарт. Иначе их пришлось бы применять отдельным шагом ДО
+# Application, а Argo CD в этом случае уходит в бесконечный OutOfSync:
+# ресурсы ссылаются на типы, которых ещё нет.
+crds:
+  enabled: true
+  # CRD не удаляются вместе с релизом: с ними ушли бы все Certificate
+  # и Issuer кластера.
+  keep: true
+
+replicaCount: 1
+webhook:
+  replicaCount: 1
+cainjector:
+  replicaCount: 1
+
+global:
+  priorityClassName: platform-critical
+  leaderElection:
+    namespace: cert-manager
+
+resources:
+  requests:
+    cpu: 10m
+    memory: 64Mi
+  limits:
+    memory: 256Mi

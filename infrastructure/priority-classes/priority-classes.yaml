@@ -1,0 +1,32 @@
+---
+# PriorityClass для platform-компонентов (раздел 21.1, пункт 17).
+#
+# Без них компоненты платформы конкурируют за узел на равных с
+# пользовательскими нагрузками: при нехватке ресурсов kubelet вытеснит
+# CNI-агент или аппрувер сертификатов так же охотно, как чей-нибудь batch-job.
+#
+# Значения ниже встроенных system-cluster-critical (2000000000) и
+# system-node-critical (2000001000) — те зарезервированы за компонентами
+# самого Kubernetes, и перебивать их нельзя.
+apiVersion: scheduling.k8s.io/v1
+kind: PriorityClass
+metadata:
+  name: platform-critical
+value: 1000000000
+# globalDefault: false обязателен и указан явно: класс с globalDefault
+# применился бы ко ВСЕМ подам без priorityClassName, включая
+# пользовательские, и обесценил бы саму идею приоритетов.
+globalDefault: false
+description: >-
+  Компоненты платформы, без которых кластер неработоспособен:
+  CNI, аппрув сертификатов, метрики, storage.
+---
+apiVersion: scheduling.k8s.io/v1
+kind: PriorityClass
+metadata:
+  name: platform-high
+value: 900000
+globalDefault: false
+description: >-
+  Компоненты платформы, отказ которых кластер переживёт:
+  observability-агенты, вспомогательные контроллеры.
