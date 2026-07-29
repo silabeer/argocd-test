@@ -1,0 +1,31 @@
+---
+# StorageClass по умолчанию.
+#
+# ВНИМАНИЕ: local-path-provisioner выделяет том НА ДИСКЕ КОНКРЕТНОГО УЗЛА.
+# Том не переживает потерю узла и не переезжает вместе с подом. Это
+# приемлемо для стенда и неприемлемо для production — там нужен настоящий
+# CSI-драйвер облака или системы хранения, а этот Application заменяется.
+#
+# Оставлять кластер вообще без default StorageClass хуже: любой PVC без
+# явного storageClassName зависает в Pending, и причина неочевидна.
+storageClass:
+  create: true
+  defaultClass: true
+  name: local-path
+  # Том остаётся после удаления PVC: на стенде это спасает от случайной
+  # потери данных, в production выбирается осознанно.
+  reclaimPolicy: Retain
+
+nodePathMap:
+  - node: DEFAULT_PATH_FOR_NON_LISTED_NODES
+    paths:
+      - /opt/local-path-provisioner
+
+priorityClassName: platform-critical
+
+resources:
+  requests:
+    cpu: 10m
+    memory: 32Mi
+  limits:
+    memory: 128Mi

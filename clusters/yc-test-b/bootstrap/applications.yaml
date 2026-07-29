@@ -1,0 +1,311 @@
+---
+# Takeover Cilium: Argo CD перенимает установку, сделанную Ansible
+# на этапе 50 (раздел 4.3, wave -10).
+#
+# Чарт берётся тот же и той же версии, values — тот же файл в этом
+# репозитории. Multi-source: первый источник даёт чарт, второй ($values)
+# отдаёт файл values из Git. Любое расхождение здесь означало бы вечный
+# OutOfSync после takeover.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: cilium
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "-10"
+spec:
+  project: platform-root
+
+  sources:
+    - repoURL: https://helm.cilium.io/
+      chart: cilium
+      targetRevision: 1.19.6
+      helm:
+        valueFiles:
+          - $values/clusters/yc-test-b/values/cilium.yaml
+    - repoURL: https://github.com/silabeer/argocd-test
+      targetRevision: main
+      ref: values
+
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: kube-system
+
+  syncPolicy:
+    # Автоматика включается ПОСЛЕ первого ручного sync и проверки
+    # `cilium status --wait`. prune — последним и осознанно (раздел 4.3).
+    syncOptions:
+      # Server-Side Apply корректно перехватывает владение полями
+      # у field manager, которым Ansible применял манифесты.
+      - ServerSideApply=true
+      - RespectIgnoreDifferences=true
+
+  # Сертификаты, которые чарт генерирует при каждом рендере. Без этого
+  # Application останется OutOfSync навсегда (раздел 4.3).
+  ignoreDifferences:
+    - group: ""
+      kind: Secret
+      name: cilium-ca
+      namespace: kube-system
+      jsonPointers:
+        - /data
+    - group: ""
+      kind: Secret
+      name: hubble-server-certs
+      namespace: kube-system
+      jsonPointers:
+        - /data
+    - group: ""
+      kind: Secret
+      name: hubble-relay-client-certs
+      namespace: kube-system
+      jsonPointers:
+        - /data
+---
+# Argo CD, управляющий сам собой (раздел 20, wave -20).
+#
+# Первый sync выполняется вручную: во время него перезапускаются
+# repo-server и application-controller, и Application некоторое время
+# остаётся Progressing — это ожидаемо.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: argocd
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "-20"
+spec:
+  project: platform-root
+
+  sources:
+    - repoURL: https://argoproj.github.io/argo-helm
+      chart: argo-cd
+      targetRevision: 10.2.1
+      helm:
+        valueFiles:
+          - $values/clusters/yc-test-b/values/argocd.yaml
+    - repoURL: https://github.com/silabeer/argocd-test
+      targetRevision: main
+      ref: values
+
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: argocd
+
+  syncPolicy:
+    syncOptions:
+      # Обязателен и по другой причине: CRD Argo CD превышают лимит
+      # аннотации last-applied-configuration, и клиентский apply на них
+      # невозможен в принципе.
+      - ServerSideApply=true
+      - RespectIgnoreDifferences=true
+---
+# Пользовательское приложение (раздел 20, wave 20).
+#
+# Едет через Git, а не kubectl: прямое применение ресурсов допускается
+# только при аварийном восстановлении и по break-glass процедуре
+# (раздел 33).
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: podinfo
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "20"
+spec:
+  project: applications
+
+  source:
+    repoURL: https://github.com/silabeer/argocd-test
+    targetRevision: main
+    path: applications/podinfo
+
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: podinfo
+
+  syncPolicy:
+    # Для пользовательского приложения автоматика включена сразу: в отличие
+    # от Cilium и Argo CD, ошибка здесь не выводит из строя сам кластер.
+    automated:
+      selfHeal: true
+      # prune намеренно выключен и включается осознанно, как и везде
+      # в этом репозитории (раздел 4.3).
+      prune: false
+    syncOptions:
+      - CreateNamespace=false
+---
+# PriorityClass для platform-компонентов (раздел 21.1, wave -25).
+#
+# Волна раньше всех компонентов, которые на классы ссылаются: под с
+# несуществующим priorityClassName отвергается admission-контроллером,
+# а не остаётся Pending.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: priority-classes
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "-25"
+spec:
+  project: platform-root
+
+  source:
+    repoURL: https://github.com/silabeer/argocd-test
+    targetRevision: main
+    path: infrastructure/priority-classes
+
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: kube-system
+
+  syncPolicy:
+    syncOptions:
+      - ServerSideApply=true
+---
+# Аппрув serving-сертификатов kubelet (wave -5).
+#
+# Раньше metrics-server: тот ходит к kubelet по TLS и без выданного
+# serving-сертификата не заработает.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: kubelet-csr-approver
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "-5"
+spec:
+  project: platform-root
+
+  sources:
+    - repoURL: https://postfinance.github.io/kubelet-csr-approver
+      chart: kubelet-csr-approver
+      targetRevision: 1.2.14
+      helm:
+        valueFiles:
+          - $values/clusters/yc-test-b/values/kubelet-csr-approver.yaml
+    - repoURL: https://github.com/silabeer/argocd-test
+      targetRevision: main
+      ref: values
+
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: kube-system
+
+  syncPolicy:
+    syncOptions:
+      - ServerSideApply=true
+---
+# cert-manager (wave 0).
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: cert-manager
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "0"
+spec:
+  project: platform-root
+
+  sources:
+    - repoURL: https://charts.jetstack.io
+      chart: cert-manager
+      targetRevision: v1.20.3
+      helm:
+        valueFiles:
+          - $values/clusters/yc-test-b/values/cert-manager.yaml
+    - repoURL: https://github.com/silabeer/argocd-test
+      targetRevision: main
+      ref: values
+
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: cert-manager
+
+  syncPolicy:
+    # Метки PSA задаются здесь, а не отдельным манифестом namespace:
+    # иначе namespace создаётся Argo CD без меток и попадает под
+    # кластерный default, а поправить его задним числом уже некому.
+    managedNamespaceMetadata:
+      labels:
+        pod-security.kubernetes.io/enforce: baseline
+        pod-security.kubernetes.io/audit: restricted
+        pod-security.kubernetes.io/warn: restricted
+    syncOptions:
+      - CreateNamespace=true
+      # CRD cert-manager велики: клиентский apply упирается в лимит
+      # аннотации last-applied-configuration.
+      - ServerSideApply=true
+---
+# StorageClass по умолчанию (wave 5).
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: local-path-provisioner
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "5"
+spec:
+  project: platform-root
+
+  sources:
+    - repoURL: https://github.com/rancher/local-path-provisioner
+      targetRevision: v0.0.36
+      path: deploy/chart/local-path-provisioner
+      helm:
+        valueFiles:
+          - $values/clusters/yc-test-b/values/local-path-provisioner.yaml
+    - repoURL: https://github.com/silabeer/argocd-test
+      targetRevision: main
+      ref: values
+
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: local-path-storage
+
+  syncPolicy:
+    # privileged здесь вынужденно: провижнер и его helper-поды монтируют
+    # hostPath, а PSA baseline (кластерный default) hostPath запрещает.
+    # Namespace выделен именно для того, чтобы послабление не расползлось
+    # на соседние нагрузки.
+    managedNamespaceMetadata:
+      labels:
+        pod-security.kubernetes.io/enforce: privileged
+        pod-security.kubernetes.io/audit: privileged
+        pod-security.kubernetes.io/warn: privileged
+    syncOptions:
+      - CreateNamespace=true
+      - ServerSideApply=true
+---
+# metrics-server (wave 10).
+#
+# После аппрувера: проверяет serving-сертификат kubelet по CA кластера,
+# а не отключает проверку через --kubelet-insecure-tls.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: metrics-server
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "10"
+spec:
+  project: platform-root
+
+  sources:
+    - repoURL: https://kubernetes-sigs.github.io/metrics-server/
+      chart: metrics-server
+      targetRevision: 3.13.1
+      helm:
+        valueFiles:
+          - $values/clusters/yc-test-b/values/metrics-server.yaml
+    - repoURL: https://github.com/silabeer/argocd-test
+      targetRevision: main
+      ref: values
+
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: kube-system
+
+  syncPolicy:
+    syncOptions:
+      - ServerSideApply=true

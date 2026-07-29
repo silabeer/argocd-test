@@ -1,0 +1,39 @@
+---
+# Корневое приложение кластера yc-test.
+#
+# Применяется Ansible на этапе 60 БЕЗ модификаций и входит в
+# kustomization.yaml этого же каталога — то есть управляет само собой.
+# Только так перевод в AppProject platform-root и любые последующие
+# изменения выполняются через PR, а не руками (раздел 18.3).
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: cluster-bootstrap
+  namespace: argocd
+  # finalizers НЕ задаются намеренно.
+  #
+  # С resources-finalizer.argocd.argoproj.io случайное удаление этого
+  # объекта каскадно снесло бы всю конфигурацию кластера. Без него
+  # удаление осиротит дочерние объекты, но не удалит их; восстановление —
+  # повторное применение манифеста.
+spec:
+  project: default
+
+  source:
+    repoURL: https://github.com/silabeer/argocd-test
+    targetRevision: main
+    path: clusters/yc-test-b/bootstrap
+
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: argocd
+
+  syncPolicy:
+    # Блок automated ОТСУТСТВУЕТ намеренно.
+    #
+    # Первый sync выполняется вручную, после `argocd app diff`. Ошибка
+    # в путях при включённом prune удалила бы ресурсы раньше, чем
+    # кто-либо успел посмотреть расхождения. Порядок включения автоматики —
+    # раздел 18.3 playbook.
+    syncOptions:
+      - CreateNamespace=true
