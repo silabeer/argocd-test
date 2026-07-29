@@ -1,5 +1,5 @@
 ---
-# Корневое приложение кластера yc-test.
+# Корневое приложение кластера k8s-east.
 #
 # Применяется Ansible на этапе 60 БЕЗ модификаций и входит в
 # kustomization.yaml этого же каталога — то есть управляет само собой.
@@ -22,7 +22,7 @@ spec:
   source:
     repoURL: https://github.com/silabeer/argocd-test
     targetRevision: main
-    path: clusters/yc-test/bootstrap
+    path: clusters/k8s-west/bootstrap
 
   destination:
     server: https://kubernetes.default.svc

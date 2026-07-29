@@ -1,5 +1,5 @@
 ---
-# Values Argo CD для стенда yc-test.
+# Values Argo CD для стенда k8s-east.
 #
 # Тот же принцип единого источника, что и для Cilium: этими values Ansible
 # ставит Argo CD на этапе 60, ими же Argo CD управляет собой в wave -20.

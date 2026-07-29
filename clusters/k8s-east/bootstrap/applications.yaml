@@ -22,7 +22,7 @@ spec:
       targetRevision: 1.19.6
       helm:
         valueFiles:
-          - $values/clusters/yc-test-b/values/cilium.yaml
+          - $values/clusters/k8s-east/values/cilium.yaml
     - repoURL: https://github.com/silabeer/argocd-test
       targetRevision: main
       ref: values
@@ -83,7 +83,7 @@ spec:
       targetRevision: 10.2.1
       helm:
         valueFiles:
-          - $values/clusters/yc-test-b/values/argocd.yaml
+          - $values/clusters/k8s-east/values/argocd.yaml
     - repoURL: https://github.com/silabeer/argocd-test
       targetRevision: main
       ref: values
@@ -183,7 +183,7 @@ spec:
       targetRevision: 1.2.14
       helm:
         valueFiles:
-          - $values/clusters/yc-test-b/values/kubelet-csr-approver.yaml
+          - $values/clusters/k8s-east/values/kubelet-csr-approver.yaml
     - repoURL: https://github.com/silabeer/argocd-test
       targetRevision: main
       ref: values
@@ -213,7 +213,7 @@ spec:
       targetRevision: v1.20.3
       helm:
         valueFiles:
-          - $values/clusters/yc-test-b/values/cert-manager.yaml
+          - $values/clusters/k8s-east/values/cert-manager.yaml
     - repoURL: https://github.com/silabeer/argocd-test
       targetRevision: main
       ref: values
@@ -254,7 +254,7 @@ spec:
       path: deploy/chart/local-path-provisioner
       helm:
         valueFiles:
-          - $values/clusters/yc-test-b/values/local-path-provisioner.yaml
+          - $values/clusters/k8s-east/values/local-path-provisioner.yaml
     - repoURL: https://github.com/silabeer/argocd-test
       targetRevision: main
       ref: values
@@ -297,7 +297,7 @@ spec:
       targetRevision: 3.13.1
       helm:
         valueFiles:
-          - $values/clusters/yc-test-b/values/metrics-server.yaml
+          - $values/clusters/k8s-east/values/metrics-server.yaml
     - repoURL: https://github.com/silabeer/argocd-test
       targetRevision: main
       ref: values
