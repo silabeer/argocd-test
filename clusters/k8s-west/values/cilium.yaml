@@ -93,3 +93,21 @@ clustermesh:
         method: cronJob
     kvstoremesh:
       enabled: true
+  # config.enabled обязателен, хотя список кластеров пуст.
+  #
+  # Deployment clustermesh-apiserver монтирует ConfigMap
+  # clustermesh-remote-users, когда tls.authMode не legacy (а по умолчанию
+  # он migration), но сам ConfigMap чарт создаёт только при
+  # config.enabled: true. При useAPIServer: true и прочих умолчаниях под
+  # уходит в Init навсегда:
+  #   MountVolume.SetUp failed ... configmap "clustermesh-remote-users" not found
+  #
+  # Список кластеров ЗДЕСЬ НЕ ЗАПОЛНЯЕТСЯ намеренно: подключение к соседу
+  # требует клиентского сертификата, подписанного ЕГО центром сертификации,
+  # то есть секрета, которого в публичном репозитории быть не может
+  # (ADR 0002, раздел 3.6). Кластеры соединяются отдельным шагом, вне
+  # GitOps, и он же наполняет секреты.
+  config:
+    enabled: true
+    domain: mesh.cilium.io
+    clusters: []
