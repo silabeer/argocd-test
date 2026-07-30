@@ -48,6 +48,14 @@ operator:
 
 hubble:
   enabled: true
+  tls:
+    auto:
+      # cronJob по той же причине, что и у clustermesh, но следствие тут
+      # шире: при method: helm чарт рендерит секрет cilium-ca — ОБЩИЙ
+      # центр сертификации всего Cilium — и затирает тот, что положила
+      # роль из секрет-бэкенда. Общий CA для Cluster Mesh не выживает,
+      # пока хоть один способ выпуска остаётся helm.
+      method: cronJob
   relay:
     enabled: true
   ui:
