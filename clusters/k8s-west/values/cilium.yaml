@@ -118,4 +118,13 @@ clustermesh:
   config:
     enabled: true
     domain: mesh.cilium.io
-    clusters: []
+    clusters:
+      - name: k8s-east
+        # Адреса узлов соседа: из них чарт делает host-alias для
+        # k8s-east.mesh.cilium.io внутри подов. Приватные, извне не
+        # маршрутизируются.
+        ips:
+          - 10.128.0.6
+          - 10.128.0.12
+          - 10.128.0.20
+        port: 32379
