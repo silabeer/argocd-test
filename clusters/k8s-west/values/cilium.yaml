@@ -63,3 +63,33 @@ resources:
   requests:
     cpu: 100m
     memory: 256Mi
+
+# Cluster Mesh (ADR 0002, раздел 3.5).
+clustermesh:
+  useAPIServer: true
+  apiserver:
+    service:
+      # NodePort, а не LoadBalancer: провайдера LoadBalancer в кластере нет,
+      # а адреса узлов стабильны. Порт обязан быть открыт между подсетями
+      # кластеров.
+      type: NodePort
+      nodePort: 32379
+    tls:
+      auto:
+        enabled: true
+        # cronJob, а НЕ helm — принципиально для нашей модели.
+        #
+        # При method: helm сертификаты генерируются в момент РЕНДЕРА чарта.
+        # И роль cilium_bootstrap, и Argo CD рендерят его при каждом
+        # прогоне, то есть CA менялся бы каждый раз, а клиентские
+        # сертификаты, выданные соседнему кластеру, становились бы
+        # недействительными — mesh разваливался бы сам собой.
+        #
+        # cronJob выпускает сертификаты заданием ВНУТРИ кластера, и
+        # повторный рендер их не трогает.
+        #
+        # certmanager был бы предпочтительнее, но на этих кластерах
+        # cert-manager пока не развёрнут.
+        method: cronJob
+    kvstoremesh:
+      enabled: true
