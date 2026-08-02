@@ -127,9 +127,20 @@ authentication:
 # версии 1.4.1: Cilium 1.19 проходит conformance именно для 1.4.x, и брать
 # более новые CRD без проверки соответствия не стоит.
 #
-# TLSRoute НЕ ставится: он только в experimental-канале. Без его CRD Cilium
-# молча отключает поддержку — это не ошибка, а осознанный отказ от
-# экспериментального канала.
+# ВМЕСТЕ со standard-каналом ОБЯЗАТЕЛЕН TLSRoute из experimental-канала той
+# же версии, даже если TLS passthrough не используется. Оператор Cilium
+# регистрирует тип TLSRoute безусловно, и без его CRD контроллер gateway
+# на каждой реконсиляции от backend-сервиса выдаёт
+#   no kind is registered for the type v1alpha2.TLSRouteList
+# и не доводит реконсиляцию до конца. Полный список CRD — docs/VERIFICATION.md.
 # -----------------------------------------------------------------------------
 gatewayAPI:
   enabled: true
+  # Явное true вместо умолчания "auto". При "auto" объект GatewayClass
+  # рендерится, только если .Capabilities.APIVersions видит CRD в кластере,
+  # а роль cilium_bootstrap вызывает `helm template` БЕЗ подключения к
+  # кластеру (раздел 4.3 — чтобы не создавать helm release secret). Значит
+  # проверка возможностей всегда ложна, GatewayClass не создаётся никогда,
+  # и Gateway остаётся без реализации при полностью здоровом Cilium.
+  gatewayClass:
+    create: "true"
