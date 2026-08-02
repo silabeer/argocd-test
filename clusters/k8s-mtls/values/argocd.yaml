@@ -1,0 +1,57 @@
+---
+# Values Argo CD для стенда k8s-mtls.
+#
+# Тот же принцип единого источника, что и для Cilium: этими values Ansible
+# ставит Argo CD на этапе 60, ими же Argo CD управляет собой в wave -20.
+
+crds:
+  install: true
+  # CRD переживают удаление релиза: их потеря means потерю всех Application.
+  keep: true
+
+configs:
+  params:
+    # На стенде нет ingress и TLS-терминации, поэтому server работает
+    # без собственного TLS. Для production так делать нельзя.
+    server.insecure: true
+
+# Стенд не отказоустойчивый: узлы 4 vCPU / 3.9 ГБ, HA-режим их не выдержит.
+# Для production раздел 3.1 требует HA-установку.
+redis-ha:
+  enabled: false
+
+controller:
+  replicas: 1
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+
+server:
+  replicas: 1
+  resources:
+    requests:
+      cpu: 50m
+      memory: 128Mi
+
+repoServer:
+  replicas: 1
+  resources:
+    requests:
+      cpu: 50m
+      memory: 128Mi
+
+applicationSet:
+  replicas: 1
+  resources:
+    requests:
+      cpu: 50m
+      memory: 128Mi
+
+notifications:
+  enabled: false
+
+dex:
+  # SSO на стенде не настраивается; для production раздел 29.4 требует его
+  # подключения и ограничения встроенного admin.
+  enabled: false

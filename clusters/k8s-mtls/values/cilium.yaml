@@ -1,0 +1,77 @@
+---
+# Идентичность кластера в Cluster Mesh (ADR 0002).
+# Имя и числовой идентификатор обязаны быть уникальны в пределах mesh;
+# id — число от 1 до 255. Живут здесь, а не в inventory Ansible: и роль
+# cilium_bootstrap, и Argo CD берут этот же файл, поэтому второе место
+# хранения было бы лишним источником расхождений.
+cluster:
+  name: k8s-mtls
+  id: 1
+
+# Туннельный режим задан ЯВНО, а не оставлен на умолчание чарта (ADR 0002,
+# раздел 3.3). При native routing связность между кластерами потребовала бы
+# маршрутизируемости pod-сетей и общего nativeRoutingCIDR на все кластеры;
+# в туннельном достаточно связности адресов узлов.
+routingMode: tunnel
+tunnelProtocol: vxlan
+
+# Прозрачное шифрование трафика между узлами (ADR 0002, раздел 3.2).
+#
+# Два условия, вытекающие из работы с Cluster Mesh:
+#   * включено во ВСЕХ кластерах mesh — смешанный режим не поддерживается;
+#   * между узлами разных кластеров должен быть разрешён UDP 51871.
+#
+# Публичные ключи в соседний кластер передаёт clustermesh-apiserver,
+# ручного обмена не требуется.
+encryption:
+  enabled: true
+  type: wireguard
+  # Шифрует и трафик между самими узлами, а не только между подами.
+  nodeEncryption: true
+# Values Cilium для стенда k8s-mtls.
+#
+# Единственный источник values и для bootstrap-установки Ansible (этап 50),
+# и для Application, забирающей Cilium под управление Argo CD (wave -10).
+# Расхождение между ними означало бы вечный OutOfSync — раздел 4.3 playbook.
+
+# На первом этапе сохраняется штатный kube-proxy. Его замена Cilium —
+# отдельное решение с отдельным тестированием (раздел 21.2).
+kubeProxyReplacement: false
+
+# Адреса Pod-подсетей узлам раздаёт controller-manager Kubernetes.
+ipam:
+  mode: kubernetes
+
+operator:
+  # На стенде один экземпляр: для production нужно два (раздел 17).
+  replicas: 1
+
+hubble:
+  enabled: true
+  tls:
+    auto:
+      # cronJob по той же причине, что и у clustermesh, но следствие тут
+      # шире: при method: helm чарт рендерит секрет cilium-ca — ОБЩИЙ
+      # центр сертификации всего Cilium — и затирает тот, что положила
+      # роль из секрет-бэкенда. Общий CA для Cluster Mesh не выживает,
+      # пока хоть один способ выпуска остаётся helm.
+      method: cronJob
+  relay:
+    enabled: true
+  ui:
+    # UI требует ingress, которого на стенде нет.
+    enabled: false
+
+# Перекатывает Pod'ы Cilium при изменении ConfigMap.
+rollOutCiliumPods: true
+
+# Узлы стенда — 4 vCPU / 3.9 ГБ, поэтому запросы ресурсов занижены
+# относительно значений по умолчанию.
+resources:
+  requests:
+    cpu: 100m
+    memory: 256Mi
+
+
+# Cluster Mesh не включается: кластер одиночный, проверяется другое —
+# mutual authentication и его поведение при отказе SPIRE.
