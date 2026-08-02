@@ -144,3 +144,8 @@ gatewayAPI:
   # и Gateway остаётся без реализации при полностью здоровом Cilium.
   gatewayClass:
     create: "true"
+
+# ВРЕМЕННО: проверка блока перезапуска в роли cilium_bootstrap (дефект 51).
+# Меняет только ключ debug в cilium-config, поведение датаплейна не трогает.
+debug:
+  enabled: true
