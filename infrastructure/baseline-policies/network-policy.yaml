@@ -27,3 +27,29 @@ spec:
   ingress:
     - from:
         - podSelector: {}
+---
+# Разрешение трафика от шлюза Gateway API.
+#
+# Без этого правила default-deny-ingress выше блокирует и запросы,
+# пришедшие через Gateway: Envoy обращается к поду как обычный источник, и
+# запрос отбрасывается. Снаружи это видно как HTTP 503 «upstream connect
+# error ... connection timeout» — про политику там ни слова, и путается с
+# неработающим приложением. В Hubble видно точно:
+#   policy-verdict:none ... Policy denied DROPPED (TCP Flags: SYN)
+#
+# Выразить источник обычным NetworkPolicy НЕЛЬЗЯ: Envoy обращается не из
+# пода, а с выделенного адреса узла под зарезервированной идентичностью
+# reserved:ingress. Ни podSelector, ни namespaceSelector её не выбирают,
+# а ipBlock потребовал бы перечислять адреса всех узлов. Поэтому именно
+# CiliumNetworkPolicy с fromEntities — разрешения разных типов политик
+# складываются, запрет из NetworkPolicy при этом сохраняется.
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: allow-gateway-api-ingress
+  namespace: podinfo
+spec:
+  endpointSelector: {}
+  ingress:
+    - fromEntities:
+        - ingress
