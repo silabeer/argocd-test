@@ -60,7 +60,14 @@ spec:
       tls:
         mode: Terminate
         certificateRefs:
-          - name: podinfo-tls
+          # group и kind заданы явно, хотя apiserver проставил бы их сам.
+          # Иначе Argo CD видит их как расхождение и держит приложение в
+          # вечном OutOfSync: применение идёт server-side, а сравнение —
+          # с тем, что записано в Git. Прописать умолчания честнее, чем
+          # закрыть их ignoreDifferences: тот скрыл бы и настоящий дрейф.
+          - group: ""
+            kind: Secret
+            name: podinfo-tls
       allowedRoutes:
         namespaces:
           from: Same
@@ -72,7 +79,10 @@ metadata:
   namespace: podinfo
 spec:
   parentRefs:
-    - name: podinfo-gw
+    # Умолчания apiserver заданы явно — см. пояснение у certificateRefs.
+    - group: gateway.networking.k8s.io
+      kind: Gateway
+      name: podinfo-gw
   rules:
     # Префикс намеренно НЕ корневой: иначе проверка маршрутизации ничего
     # не проверяет — на любой путь придёт 200 и при неработающем правиле.
@@ -88,5 +98,8 @@ spec:
               type: ReplacePrefixMatch
               replacePrefixMatch: /
       backendRefs:
-        - name: podinfo
+        - group: ""
+          kind: Service
+          name: podinfo
           port: 80
+          weight: 1
