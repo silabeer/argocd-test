@@ -36,7 +36,15 @@ encryption:
 
 # На первом этапе сохраняется штатный kube-proxy. Его замена Cilium —
 # отдельное решение с отдельным тестированием (раздел 21.2).
-kubeProxyReplacement: false
+# Замена kube-proxy — предусловие Gateway API от Cilium (ADR 0001).
+#
+# На этом стенде предусловие самого ADR НЕ выполнено: control-plane узел
+# один, балансировщика нет, поэтому k8sServiceHost указывает на
+# единственный узел. Для проверки механики это приемлемо, для выводов о
+# production — нет.
+kubeProxyReplacement: true
+k8sServiceHost: 10.129.0.30
+k8sServicePort: 6443
 
 # Адреса Pod-подсетей узлам раздаёт controller-manager Kubernetes.
 ipam:
