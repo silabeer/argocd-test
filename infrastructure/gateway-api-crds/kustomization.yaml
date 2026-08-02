@@ -1,0 +1,27 @@
+---
+# CRD Gateway API, зафиксированные содержимым, а не ссылкой.
+#
+# Версия 1.4.1: Cilium 1.19 проходит conformance именно для 1.4.x. При
+# смене версии файлы перекачиваются целиком из
+# https://github.com/kubernetes-sigs/gateway-api/tree/v1.4.1/config/crd
+#
+# Почему файлы лежат здесь, а не подтягиваются kustomize по URL:
+#   * их применяет не только Argo CD, но и Ansible на этапе 50 — до того,
+#     как Argo CD вообще существует. Общий источник исключает расхождение;
+#   * содержимое зафиксировано: пересборка стенда через год даст ровно те
+#     же CRD, а не то, что окажется в ветке на тот момент.
+#
+# tlsroutes — из EXPERIMENTAL-канала, и это обязательно. Оператор Cilium
+# регистрирует тип TLSRoute безусловно; без CRD контроллер gateway на
+# каждой реконсиляции от backend-сервиса выдаёт
+# «no kind is registered for the type v1alpha2.TLSRouteList».
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+resources:
+  - gatewayclasses.yaml
+  - gateways.yaml
+  - httproutes.yaml
+  - grpcroutes.yaml
+  - referencegrants.yaml
+  - tlsroutes.yaml

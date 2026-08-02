@@ -1,0 +1,92 @@
+---
+# Пул адресов для сервисов типа LoadBalancer.
+#
+# Диапазон 192.0.2.0/29 — RFC 5737, зарезервирован под документацию.
+# Выбран НАМЕРЕННО: занять адрес из подсети облака нельзя, там адресами
+# распоряжается сам провайдер, а совпадение вскроется отказом чужой
+# машины. Обратная сторона: адрес виден только изнутри кластера —
+# анонсировать его в облачной VPC нечем, ни L2-анонсы, ни BGP там не
+# работают. Вход снаружи на стенде идёт через NodePort сервиса
+# cilium-gateway-podinfo-gw.
+#
+# На физической площадке сюда ставится настоящий диапазон и включается
+# один из механизмов анонса — до этого Gateway работает, но снаружи
+# недоступен.
+apiVersion: cilium.io/v2
+kind: CiliumLoadBalancerIPPool
+metadata:
+  name: stand-pool
+spec:
+  blocks:
+    - cidr: 192.0.2.0/29
+---
+# Сертификат для HTTPS-listener. Секрет обязан лежать в namespace самого
+# Gateway: ссылка на секрет из чужого namespace потребовала бы
+# ReferenceGrant.
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: podinfo-tls
+  namespace: podinfo
+spec:
+  secretName: podinfo-tls
+  dnsNames:
+    - podinfo.stand.local
+  issuerRef:
+    name: stand-ca
+    kind: ClusterIssuer
+---
+apiVersion: gateway.networking.k8s.io/v1
+kind: Gateway
+metadata:
+  name: podinfo-gw
+  namespace: podinfo
+spec:
+  gatewayClassName: cilium
+  listeners:
+    - name: http
+      protocol: HTTP
+      port: 80
+      allowedRoutes:
+        namespaces:
+          from: Same
+    - name: https
+      protocol: HTTPS
+      port: 443
+      # hostname обязателен: по нему Envoy выбирает listener по SNI.
+      # Запрос с другим именем получит отказ ещё на рукопожатии — это
+      # ожидаемое поведение, а не отказ шлюза.
+      hostname: podinfo.stand.local
+      tls:
+        mode: Terminate
+        certificateRefs:
+          - name: podinfo-tls
+      allowedRoutes:
+        namespaces:
+          from: Same
+---
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: podinfo
+  namespace: podinfo
+spec:
+  parentRefs:
+    - name: podinfo-gw
+  rules:
+    # Префикс намеренно НЕ корневой: иначе проверка маршрутизации ничего
+    # не проверяет — на любой путь придёт 200 и при неработающем правиле.
+    # При такой записи /gw даёт 200, а /nomatch обязан дать 404.
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /gw
+      filters:
+        - type: URLRewrite
+          urlRewrite:
+            path:
+              type: ReplacePrefixMatch
+              replacePrefixMatch: /
+      backendRefs:
+        - name: podinfo
+          port: 80

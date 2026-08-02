@@ -1,0 +1,45 @@
+---
+# Центр сертификации стенда.
+#
+# Цепочка из трёх объектов, и порядок между ними держит сам cert-manager:
+# selfsigned-root подписывает сертификат stand-ca, а тот становится
+# издателем для остальных. Промежуточного шага не избежать: selfSigned
+# не умеет подписывать чужие сертификаты, а ca-издателю нужен готовый
+# секрет с ключом.
+#
+# Для production вместо этого ставится ACME (Let's Encrypt) или издатель
+# поверх корпоративного PKI. Самоподписанный корень годится ровно для
+# стенда: клиентам придётся раздавать его сертификат руками.
+apiVersion: cert-manager.io/v1
+kind: ClusterIssuer
+metadata:
+  name: selfsigned-root
+spec:
+  selfSigned: {}
+---
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: stand-ca
+  # Namespace задан явно: секрет с ключом CA должен лежать там, где его
+  # ищет ClusterIssuer ниже, а тот берёт его из namespace самого
+  # cert-manager, а не из namespace приложения.
+  namespace: cert-manager
+spec:
+  isCA: true
+  commonName: stand-ca
+  secretName: stand-ca
+  privateKey:
+    algorithm: ECDSA
+    size: 256
+  issuerRef:
+    name: selfsigned-root
+    kind: ClusterIssuer
+---
+apiVersion: cert-manager.io/v1
+kind: ClusterIssuer
+metadata:
+  name: stand-ca
+spec:
+  ca:
+    secretName: stand-ca
